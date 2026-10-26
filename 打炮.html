@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>打炮 · 三管阵地</title>
+<style>
+  :root{
+    --ink:#6d2a86;
+    --ink-soft:#9b6bb1;
+    --paper:#ffffff;
+    --shade:#f7f2fa;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"HarmonyOS Sans SC","PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{display:flex;height:100vh;width:100vw;}
+  #boardWrap{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:8px;min-width:0;}
+  canvas{display:block;touch-action:manipulation;cursor:default;}
+
+  #side{
+    width:352px;flex:0 0 352px;height:100%;
+    border-left:2px solid var(--ink-soft);
+    display:flex;flex-direction:column;
+    background:linear-gradient(180deg,#fff 0%,#faf5fd 100%);
+  }
+  .sideTop{padding:12px 14px 10px;border-bottom:2px dashed var(--ink-soft);}
+  h1{font-size:20px;margin:0;letter-spacing:3px;font-weight:800;}
+  .sub{font-size:11px;color:var(--ink-soft);letter-spacing:1px;margin-top:3px;}
+
+  #seats{display:flex;flex-direction:column;gap:6px;padding:10px 12px;overflow:auto;flex:0 0 auto;max-height:38%;}
+  .seat{
+    border:2px solid var(--ink-soft);border-radius:10px;padding:6px 9px;
+    display:flex;align-items:center;gap:8px;font-size:12.5px;position:relative;
+    background:#fff;transition:.18s;
+  }
+  .seat.active{border-color:var(--ink);box-shadow:0 0 0 3px #eadcf3;transform:translateX(2px);}
+  .seat.dead{opacity:.36;filter:grayscale(1);}
+  .dot{width:13px;height:13px;border-radius:4px;border:2px solid var(--ink);flex:0 0 auto;}
+  .seatName{font-weight:700;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ap{display:flex;gap:3px;align-items:center;}
+  .pip{width:9px;height:9px;border-radius:50%;border:1.6px solid var(--ink);}
+  .pip.on{background:var(--ink);}
+  .badge{font-size:11px;border:1.6px solid var(--ink-soft);border-radius:6px;padding:0 4px;color:var(--ink-soft);}
+  .icons{display:flex;gap:5px;font-size:13px;line-height:1;}
+
+  #actionBox{padding:8px 12px 4px;border-top:2px dashed var(--ink-soft);}
+  #hint{font-size:12px;min-height:32px;color:#4b1f60;line-height:1.45;}
+  #buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  button{
+    font-family:inherit;font-size:12.5px;font-weight:600;
+    color:var(--ink);background:#fff;
+    border:2px solid var(--ink);border-radius:9px;
+    padding:5px 9px;cursor:pointer;transition:.15s;
+  }
+  button:hover:not(:disabled){background:#f0e4f8;transform:translateY(-1px);}
+  button:active:not(:disabled){transform:translateY(0);}
+  button:disabled{opacity:.3;cursor:not-allowed;}
+  button.primary{background:var(--ink);color:#fff;}
+  button.primary:hover:not(:disabled){background:#8a3ea6;}
+  button.small{font-size:11.5px;padding:3px 7px;}
+
+  #log{flex:1 1 auto;overflow:auto;padding:8px 12px 16px;font-size:12px;line-height:1.6;border-top:2px dashed var(--ink-soft);}
+  #log div{margin-bottom:2px;}
+  #log div:first-child{color:#4b1f60;font-weight:700;}
+  .lwarn{color:#b3402f;}
+  .lgood{color:#2f7d4f;}
+
+  .overlay{
+    position:fixed;inset:0;background:rgba(255,255,255,.93);
+    display:flex;align-items:center;justify-content:center;
+    z-index:50;backdrop-filter:blur(3px);
+  }
+  .overlay.hidden{display:none;}
+  .panel{
+    border:3px solid var(--ink);border-radius:18px;padding:22px 26px;background:#fff;
+    max-width:min(780px,92vw);max-height:92vh;overflow:auto;text-align:center;
+    box-shadow:0 10px 0 -2px #efe3f7;
+  }
+  .panel h2{margin:0 0 4px;font-size:26px;letter-spacing:6px;}
+  .panel p{font-size:13px;color:#5c3271;line-height:1.6;margin:6px 0;}
+  .modes{display:flex;gap:12px;justify-content:center;margin:16px 0 8px;flex-wrap:wrap;}
+  .modeCard{
+    border:2.5px solid var(--ink);border-radius:14px;padding:10px 14px;cursor:pointer;
+    width:150px;transition:.16s;background:#fff;
+  }
+  .modeCard:hover{background:#f4eafb;transform:translateY(-3px);}
+  .modeCard.sel{background:#efe0f8;box-shadow:0 0 0 3px #e3cff1;}
+  .modeCard b{display:block;font-size:15px;margin-bottom:2px;}
+  .modeCard small{font-size:11px;color:var(--ink-soft);line-height:1.4;display:block;}
+  .seatCfg{display:flex;flex-direction:column;gap:6px;margin:12px auto 4px;width:330px;}
+  .seatRow{display:flex;align-items:center;gap:8px;font-size:12.5px;justify-content:space-between;
+    border:2px solid var(--ink-soft);border-radius:9px;padding:5px 10px;}
+  .seatRow select{font-family:inherit;font-size:12.5px;color:var(--ink);border:2px solid var(--ink-soft);
+    border-radius:7px;padding:3px 6px;background:#fff;}
+  .bigBtn{font-size:15px;padding:9px 26px;border-radius:12px;margin-top:14px;letter-spacing:2px;}
+
+  .rpsRow{display:flex;gap:18px;justify-content:center;margin:18px 0 6px;}
+  .rpsBtn{
+    width:110px;height:120px;border:2.5px solid var(--ink);border-radius:16px;background:#fff;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:13px;font-weight:700;color:var(--ink);transition:.16s;
+  }
+  .rpsBtn:hover{background:#f4eafb;transform:translateY(-4px) scale(1.03);}
+  .rpsBtn svg{width:56px;height:56px;stroke:var(--ink);stroke-width:6;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .rpsHand{font-size:46px;line-height:1;}
+  .rulesGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:left;font-size:12.5px;line-height:1.65;}
+  .rulesGrid h3{margin:0 0 4px;font-size:14px;border-bottom:2px solid var(--ink-soft);padding-bottom:3px;}
+  .rulesGrid ul{margin:0;padding-left:18px;}
+  .rulesGrid li{margin-bottom:3px;}
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px;}
+  .gallery img{width:100%;border:2px solid var(--ink-soft);border-radius:8px;background:#fff;}
+  .tabs{display:flex;gap:6px;justify-content:center;margin-bottom:10px;}
+  .tabs button.on{background:var(--ink);color:#fff;}
+  kbd{background:#f2e8f9;border:1.5px solid var(--ink-soft);border-radius:5px;padding:0 5px;font-size:11.5px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="boardWrap"><canvas id="board" width="1000" height="1000"></canvas></div>
+  <aside id="side">
+    <div class="sideTop">
+      <h1>打 炮</h1>
+      <div class="sub">三管阵地 · 一个行动点一层地基</div>
+    </div>
+    <div id="seats"></div>
+    <div id="actionBox">
+      <div id="hint"></div>
+      <div id="buttons"></div>
+    </div>
+    <div id="log"></div>
+  </aside>
+</div>
+
+<div id="startOverlay" class="overlay">
+  <div class="panel">
+    <h2>打 炮</h2>
+    <p>石头剪刀布赢一个行动点，赢一次修一层地基。先插旗，再造炮，开对方的门，轰平他的地基。</p>
+    <div class="modes" id="modes">
+      <div class="modeCard sel" data-mode="2"><b>双人对决</b><small>一人一边半圆<br>经典 1v1</small></div>
+      <div class="modeCard" data-mode="3p"><b>三人平分</b><small>三等分战场<br>没有三管炮，纯 1v1 打法</small></div>
+      <div class="modeCard" data-mode="3"><b>三人混战</b><small>三等分圆环<br>中心三管炮</small></div>
+      <div class="modeCard" data-mode="4"><b>四人经典</b><small>四等分圆环<br>中心三管炮</small></div>
+    </div>
+    <div class="seatCfg" id="seatCfg"></div>
+    <button class="primary bigBtn" id="startBtn">开 战</button>
+    <button class="small" id="rulesBtn" style="margin-left:8px">游戏规则</button>
+  </div>
+</div>
+
+<div id="modalOverlay" class="overlay hidden">
+  <div class="panel" id="modalPanel"></div>
+</div>
+
+<script>
+/* =======================================================================
+   打炮 · 三管阵地
+   规则来源：游戏介绍.txt（阿汤哥的聊天记录）
+   门：每家一道门朝每个邻居；开门的是进攻方，关门 / 上锁的是门的主人。
+   中心边界也是两扇门：三管炮朝你的一扇（抢炮用）+ 你朝中心的一扇（炮主打你用）。
+   ======================================================================= */
+
+const D2R = Math.PI / 180;
+const CX = 500, CY = 500, R = 400;
+let RIN = 0.42 * R;            // 只有带中心圈的战场才用到
+const INK = '#6d2a86';
+const GREEN = '#2f9e5f';
+
+const cvs = document.getElementById('board');
+const ctx = cvs.getContext('2d');
+
+/* ---------------- 平滑线条工具 ---------------- */
+function ink(w, col) {
+  ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = col || INK;
+}
+function sLine(x1, y1, x2, y2, w, col) {
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ink(w, col); ctx.stroke();
+}
+function sArc(cx, cy, r, a0, a1, w, col) {
+  ctx.beginPath(); ctx.arc(cx, cy, r, a0 * D2R, a1 * D2R, false); ink(w, col); ctx.stroke();
+}
+function sCircle(cx, cy, r, w, col) {
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ink(w, col); ctx.stroke();
+}
+function sPoly(pts, w, close, col) {
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) { if (i) ctx.lineTo(pts[i][0], pts[i][1]); else ctx.moveTo(pts[i][0], pts[i][1]); }
+  if (close) ctx.closePath();
+  ink(w, col); ctx.stroke();
+}
+function sRect(x, y, w, h, lw, col) {
+  sPoly([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], lw, true, col);
+}
+function fillPoly(pts, color) {
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) { if (i) ctx.lineTo(pts[i][0], pts[i][1]); else ctx.moveTo(pts[i][0], pts[i][1]); }
+  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+}
+const pol = (cx, cy, r, deg) => [cx + r * Math.cos(deg * D2R), cy + r * Math.sin(deg * D2R)];
+
+/* ---------------- 音效 ---------------- */
+let AC = null;
+function tone(freq, dur, type, vol, slideTo) {
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'triangle';
+    o.frequency.setValueAtTime(freq, AC.currentTime);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, AC.currentTime + dur);
+    g.gain.setValueAtTime(0.0001, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.12, AC.currentTime + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + dur + 0.03);
+  } catch (e) { /* 静音环境忽略 */ }
+}
+const SFX = {
+  click: () => tone(660, 0.07, 'triangle', 0.07),
+  build: () => { tone(420, 0.10, 'square', 0.06); setTimeout(() => tone(620, 0.12, 'square', 0.05), 80); },
+  plant: () => { tone(520, 0.10, 'triangle', 0.08); setTimeout(() => tone(780, 0.16, 'triangle', 0.07), 90); },
+  lock:  () => tone(200, 0.14, 'sawtooth', 0.07),
+  open:  () => tone(300, 0.16, 'sine', 0.08, 620),
+  boom:  () => { tone(140, 0.34, 'sawtooth', 0.16, 40); tone(90, 0.42, 'square', 0.10, 30); },
+  win:   () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.26, 'triangle', 0.10), i * 110)); },
+  lose:  () => { [440, 349, 262].forEach((f, i) => setTimeout(() => tone(f, 0.34, 'sawtooth', 0.09), i * 150)); }
+};
+
+/* =======================================================================
+   1. 棋盘几何
+   2人：圆被直径切两半，墙上有两道门（一人一道）
+   3/4人：圆环等分，扇区之间是侧墙，每家还有一道通向中心的内门
+   ======================================================================= */
+const MODES = {
+  '2':  { n: 2, area: '半圆',   mid: [180, 0], half: 90, ring: false, center: false },
+  '3':  { n: 3, area: '圆环',   mid: [90, 210, 330], half: 60, ring: true, center: true },
+  '3p': { n: 3, area: '三等分', mid: [90, 210, 330], half: 60, ring: false, center: false },
+  '4':  { n: 4, area: '圆环',   mid: [90, 180, 270, 0], half: 45, ring: true, center: true }
+};
+const M = () => MODES[S.mode];
+const hasCenter = () => !!M().center;
+/* 名字按棋盘上的实际方位取（mid 用屏幕坐标角度：90=下 270=上 0=右 180=左） */
+const MODE_NAMES = {
+  '2':  ['左军', '右军'],
+  '3':  ['下军', '左军', '右军'],
+  '3p': ['下军', '左军', '右军'],
+  '4':  ['下军', '左军', '上军', '右军']
+};
+const COLORS = ['#8e44ad', '#2f7fd8', '#e08a1e', '#2f9e5f'];
+const TINTS  = ['rgba(142,68,173,0.07)', 'rgba(47,127,216,0.07)', 'rgba(224,138,30,0.07)', 'rgba(47,158,95,0.07)'];
+const TINTS2 = ['rgba(142,68,173,0.20)', 'rgba(47,127,216,0.20)', 'rgba(224,138,30,0.20)', 'rgba(47,158,95,0.20)'];
+
+function inSector(deg, mid, half) {
+  let d = deg - mid; while (d < -180) d += 360; while (d > 180) d -= 360;
+  return Math.abs(d) <= half;
+}
+function territoryFrame(id) {
+  const cfg = M(), mid = cfg.mid[id], half = cfg.half;
+  if (S.n === 2) {
+    const back = pol(CX, CY, R, mid);
+    const fa = (mid + 180) % 360;
+    const f = [Math.cos(fa * D2R), Math.sin(fa * D2R)];
+    return {
+      kind: 'half', mid, half, back, fa, f, p: [0, 1],
+      // 三层地基贴着外圈排紧一点，中间整片留给旗子和炮
+      arcCenter: back, arcR: [0.30 * R, 0.40 * R, 0.50 * R],
+      buildBase: [back[0] + f[0] * 0.76 * R, back[1] + f[1] * 0.76 * R],
+      spacing: 0.22 * R
+    };
+  }
+  const f = [-Math.cos(mid * D2R), -Math.sin(mid * D2R)];
+  if (!hasCenter()) {
+    // 三等分这类没有中心圈的战场：从圆心直接切出去的扇形
+    return {
+      kind: 'wedge', mid, half, fa: mid, f, p: [-f[1], f[0]],
+      // 三等分没有中心圈：地基收成一窄条，外圈整片留给旗子和炮
+      arcCenter: [CX, CY], arcR: [0.34 * R, 0.44 * R, 0.54 * R],
+      buildBase: pol(CX, CY, 0.78 * R, mid), slotR: 0.78 * R,
+      spacing: 0.20 * R
+    };
+  }
+  return {
+    kind: 'ring', mid, half, fa: mid, f, p: [-f[1], f[0]],
+    // 三层地基贴着外圈排紧一点，内圈整片留给旗子和炮
+    arcCenter: [CX, CY], arcR: [0.89 * R, 0.81 * R, 0.73 * R],
+    buildBase: pol(CX, CY, 0.58 * R, mid), slotR: 0.58 * R,
+    spacing: 0.185 * R
+  };
+}
+function territoryPath(id) {
+  const cfg = M(), mid = cfg.mid[id], half = cfg.half;
+  ctx.beginPath();
+  if (S.n === 2) {
+    ctx.arc(CX, CY, R, (mid - half) * D2R, (mid + half) * D2R, false);
+    ctx.closePath();
+  } else if (M().center) {
+    const a0 = (mid - half) * D2R, a1 = (mid + half) * D2R;
+    ctx.arc(CX, CY, R, a0, a1, false);
+    ctx.arc(CX, CY, RIN, a1, a0, true);
+    ctx.closePath();
+  } else {
+    const a0 = (mid - half) * D2R, a1 = (mid + half) * D2R;
+    ctx.arc(CX, CY, R, a0, a1, false);
+    ctx.lineTo(CX, CY);
+    ctx.closePath();
+  }
+}
+function ringStep(fr) { return Math.min(12, fr.half * 0.40); }
+function slotsOf(id, count) {
+  const fr = territoryFrame(id);
+  const out = [];
+  const n = Math.max(1, count || 1);
+  if (fr.kind !== 'half') {
+    const step = ringStep(fr);
+    for (let i = 0; i < n; i++) out.push(pol(CX, CY, fr.slotR, fr.mid + (i - (n - 1) / 2) * step));
+  } else {
+    for (let i = 0; i < n; i++) {
+      const off = (i - (n - 1) / 2) * fr.spacing;
+      out.push([fr.buildBase[0] + fr.p[0] * off, fr.buildBase[1] + fr.p[1] * off]);
+    }
+  }
+  return out;
+}
+function slotAngle(id, index, count) {
+  const fr = territoryFrame(id);
+  if (fr.kind === 'half') return Math.atan2(fr.f[1], fr.f[0]);
+  const n = Math.max(1, count || 1);
+  const a = (fr.mid + (index - (n - 1) / 2) * ringStep(fr)) * D2R;
+  return Math.atan2(-Math.sin(a), -Math.cos(a));
+}
+
+/* ---------------- 墙与门 ---------------- */
+function wallAngle(i, j) {
+  const cfg = M();
+  if (S.n === 2) return 90;
+  const jj = (j - i + S.n) % S.n;
+  if (jj === 1) return cfg.mid[i] + cfg.half;
+  return cfg.mid[j] + cfg.half;
+}
+/* 每家一道侧门朝每个邻居，另有一道内门通往中心 */
+function buildDoors() {
+  const ds = []; let id = 0;
+  const n = S.n;
+  for (let i = 0; i < n; i++) {
+    if (n === 2) {
+      ds.push({ id: id++, owner: i, target: 1 - i, kind: 'wall', locked: false, open: false });
+    } else {
+      ds.push({ id: id++, owner: i, target: (i + 1) % n, kind: 'side', locked: false, open: false });
+      ds.push({ id: id++, owner: i, target: (i - 1 + n) % n, kind: 'side', locked: false, open: false });
+      if (M().center) {
+        // 中心边界也是两扇门：自家通往中心的内门 + 三管炮朝自家的炮门
+        ds.push({ id: id++, owner: i, target: 'center', kind: 'center', locked: false, open: false });
+        // 炮门：开局上锁（"先开中间的锁 → 再开中间的门 → 一炮占领"）
+        ds.push({ id: id++, owner: 'center', target: i, kind: 'cannon', locked: true, open: false });
+      }
+    }
+  }
+  return ds;
+}
+function doorOf(owner, target) {
+  return S.doors.find(d => d.owner === owner && d.target === target) || null;
+}
+function doorPos(d) {
+  const cfg = M();
+  if (d.kind === 'center') return pol(CX, CY, RIN + 13, cfg.mid[d.owner]);    // 内门画在自家这一侧
+  if (d.kind === 'cannon') return pol(CX, CY, RIN - 15, cfg.mid[d.target]);   // 炮门画在中心这一侧
+  if (S.n === 2) return [CX + (d.owner === 0 ? -1 : 1) * 32, CY];
+  const wa = wallAngle(d.owner, d.target), a = wa * D2R;
+  const diff = ((wa - cfg.mid[d.owner] + 540) % 360) - 180;
+  const side = diff > 0 ? -1 : 1;      // 朝自家领地那一侧偏一点
+  const m = (RIN + R) / 2, off = 11;
+  return [CX + Math.cos(a) * m - Math.sin(a) * side * off,
+          CY + Math.sin(a) * m + Math.cos(a) * side * off];
+}
+function doorAxis(d) {
+  if (d.kind === 'center') return M().mid[d.owner] + 90;
+  if (d.kind === 'cannon') return M().mid[d.target] + 90;
+  if (S.n === 2) return 90;
+  return wallAngle(d.owner, d.target);
+}
+
+/* ---------------- 状态 ---------------- */
+let S = null;
+let FX = [];
+
+function newGame(mode, seats) {
+  // 兼容传数字（2 / 3 / 4）或模式键（'3p' …）
+  const key = MODES[mode] ? mode : (MODES[String(mode)] ? String(mode) : '2');
+  const cfg = MODES[key];
+  const n = cfg.n;
+  RIN = cfg.ring ? 0.42 * R : 0;
+  const players = [];
+  for (let i = 0; i < n; i++) {
+    players.push({
+      id: i, name: MODE_NAMES[key][i], color: COLORS[i], tint: TINTS[i],
+      isAI: seats[i] === 'ai',
+      ap: 0, foundation: 0, flag: false, cannons: [],
+      alive: true, killedBy: null
+    });
+  }
+  S = {
+    mode: key, n, players, doors: [],
+    center: { owner: null },
+    phase: 'idle', round: 0,
+    turnPlayer: null, pending: null, awaiting: null, rpsResolver: null,
+    log: [], hover: null
+  };
+  S.doors = buildDoors();
+  FX = [];
+  pushLog('开战！' + n + '人' + cfg.area + '战场。' + (cfg.center ? '中心摆着全场唯一的三管炮。' : ''));
+  pushLog('每家开局没有地基，先赢石头剪刀布攒行动点吧。');
+  renderSeats(); renderButtons(); renderLog(); draw();
+}
+function P(i) { return S.players[i]; }
+function alive() { return S.players.filter(p => p.alive); }
+function pushLog(t, cls) {
+  S.log.unshift({ t, cls: cls || '' });
+  if (S.log.length > 90) S.log.pop();
+  renderLog();
+}
+
+/* =======================================================================
+   2. 判定
+   门是「谁的门谁能关/上锁」：要打谁，就先去开谁的门。
+   ======================================================================= */
+function bestCannon(i) {
+  const c = P(i).cannons;
+  if (c.indexOf('double') >= 0) return 'double';
+  if (c.indexOf('single') >= 0) return 'single';
+  return null;
+}
+/* 能不能打到 target：target 朝我的那扇门得是开着的 */
+/* 占领区：自家领地 + 我打下来的地盘（被打死的玩家）+ 中心三管炮 */
+function conquerorOf(id) {
+  const p = P(id);
+  return (p && !p.alive && p.killedBy !== null && p.killedBy !== undefined) ? p.killedBy : null;
+}
+function zonesOf(i) {
+  const z = [i];
+  for (const q of S.players) if (q.id !== i && !q.alive && q.killedBy === i) z.push(q.id);
+  if (S.center.owner === i) z.push('center');
+  return z;
+}
+function conqueredCount(i) { return zonesOf(i).filter(z => z !== 'center' && z !== i).length; }
+/* 从我的哪个区域打得进去：返回那扇开着的门；打不到返回 null
+   fromCenter=true 表示这一炮是中心三管炮打的，只能走别人朝中心的内门 */
+function shotDoor(att, target, fromCenter) {
+  if (fromCenter) {
+    // 三管炮架在正中间：跟人打人一样，得先把"对方朝中心的内门"推开才打得进去
+    if (S.center.owner !== att) return null;
+    const c = doorOf(target, 'center');
+    return (c && c.open && !c.locked) ? c : null;
+  }
+  for (const z of zonesOf(att)) {
+    // 自家的炮架在自己的地盘上，走不到中心那条线
+    if (z === 'center') continue;
+    const d = doorOf(target, z);
+    if (d && d.open && !d.locked) return d;
+  }
+  return null;
+}
+function canShoot(att, target) { return !!shotDoor(att, target, false); }
+function normalTargets(a) {
+  return alive().filter(q => q.id !== a && canShoot(a, q.id)).map(q => q.id);
+}
+/* 中心三管炮够得着谁：谁朝中心的内门开着就打得到谁 */
+function centerReach(a) {
+  return alive().filter(q => q.id !== a && !!shotDoor(a, q.id, true)).map(q => q.id);
+}
+/* 三管炮朝我开着炮门 = 我可以一炮抢下它 */
+function cannonDoorOpen(id) {
+  const d = doorOf('center', id);
+  return !!(d && d.open && !d.locked);
+}
+function canTakeCenter(id) {
+  return hasCenter() && P(id).cannons.length > 0 && cannonDoorOpen(id) && S.center.owner !== id;
+}
+/* 这块地盘（自家 + 打下来的占领区）边界上的门，开关上锁都归我 */
+function myZone(i, who) { return zonesOf(i).indexOf(who) >= 0; }
+
+/* 开门：开门的是"进攻方"，门画在被打开那家（或三管炮）的地盘上。
+   画在自家地盘上的门（自己的门 / 占领区里的门）只关不"开"。 */
+function canOpen(i, d) {
+  if (!d || d.open || d.locked) return false;
+  // 炮门：我推开三管炮朝我自己那扇门 = 我要抢炮
+  if (d.kind === 'cannon') return hasCenter() && i === d.target;
+  const ow = P(d.owner);
+  if (!ow || !ow.alive) return false;          // 死人的门 / 占领区里那扇门不是拿来开的
+  if (myZone(i, d.owner)) return false;        // 自家地盘上的门不"开"
+  // 内门：占了中心的炮主推开对手的内门，从中心打他
+  if (d.kind === 'center') return hasCenter() && S.center.owner === i;
+  return myZone(i, d.target);                  // 对手朝我这块地盘的门：由我来开
+}
+/* 开锁：谁的门谁自己开锁；要打进去的那家在炮门口撬锁；炮主也能撬对手内门的锁 */
+function canUnlock(i, d) {
+  if (!d || !d.locked) return false;
+  if (d.kind === 'cannon') return hasCenter() && (i === d.target || S.center.owner === i);
+  if (d.kind === 'center') return hasCenter() && (d.owner === i || S.center.owner === i);
+  return myZone(i, d.owner) || myZone(i, d.target);
+}
+/* 关门：门画在谁地盘上谁关；炮门归炮主关（挡住别人抢炮） */
+function canClose(i, d) {
+  if (!d || !d.open) return false;
+  if (d.kind === 'cannon') return hasCenter() && S.center.owner === i;
+  if (d.kind === 'center') return hasCenter() && d.owner === i;
+  return myZone(i, d.owner);
+}
+/* 上锁：锁要先关门（这里天然要求门是关着的） */
+function canLock(i, d) {
+  if (!d || d.open || d.locked) return false;
+  if (d.kind === 'cannon') return hasCenter() && S.center.owner === i;
+  if (d.kind === 'center') return hasCenter() && d.owner === i;
+  return myZone(i, d.owner);
+}
+
+function openTargets(i)   { return S.doors.filter(d => canOpen(i, d)); }
+function unlockTargets(i) { return S.doors.filter(d => canUnlock(i, d)); }
+function closeTargets(i)  { return S.doors.filter(d => canClose(i, d)); }
+function lockTargets(i)   { return S.doors.filter(d => canLock(i, d)); }
+
+function spend(id, n) { P(id).ap -= (n || 1); renderSeats(); }
+function playerHits(p) { return p.cannons.length + (p.flag ? 1 : 0) + p.foundation; }
+
+/* 一发命中：优先打炮 → 再打旗 → 最后打地基 */
+function applyHit(targetId, byId) {
+  const p = P(targetId);
+  if (!p.alive) return;
+  let what, idx = -1;
+  if (p.cannons.length) { p.cannons.pop(); what = '一门炮'; idx = p.cannons.length; }
+  else if (p.flag) { p.flag = false; what = '旗'; idx = 0; }
+  else if (p.foundation > 0) { p.foundation--; what = '一层地基'; idx = 0; }
+  else { what = '空阵地'; idx = 0; }
+
+  const slots = slotsOf(targetId, Math.max(1, (p.flag ? 1 : 0) + p.cannons.length + 1));
+  let at = slots[0];
+  if (what === '一门炮') at = slots[(p.flag ? 1 : 0) + idx] || slots[0];
+  boom(at[0], at[1], p.color);
+  SFX.boom();
+  pushLog(P(byId).name + ' 打掉了 ' + p.name + ' 的' + what + '！', 'lwarn');
+
+  // 地基被打光 → 出局（正好打没也算）
+  // 本来就没地基、又被结结实实打了一发 → 也出局
+  if (p.foundation <= 0) {
+    p.alive = false; p.cannons = []; p.flag = false; p.killedBy = byId;
+    pushLog('☠ ' + p.name + ' 的地基被轰平，出局！', 'lwarn');
+    if (S.n > 2) pushLog('⚑ ' + P(byId).name + ' 接管了 ' + p.name + ' 的地盘，' + p.name + ' 的门现在归 ' + P(byId).name + ' 开关。', 'lgood');
+  }
+}
+/* 双管炮 / 三管炮：对着同一个目标连砸 n 点；打穿了就是打穿了，伤害不溢出到别人 */
+function applyHits(targetId, byId, n) {
+  let got = 0;
+  for (let k = 0; k < n; k++) {
+    if (!P(targetId).alive) break;
+    applyHit(targetId, byId); got++;
+  }
+  return got;
+}
+function checkOver() {
+  const a = alive();
+  if (a.length <= 1) {
+    S.phase = 'over';
+    if (a[0]) { pushLog('🏆 ' + a[0].name + ' 守住了阵地，胜利！', 'lgood'); SFX.win(); showResult(a[0]); }
+    return true;
+  }
+  return false;
+}
+
+/* ---------------- 建造 ---------------- */
+async function actBuild(id) {
+  const p = P(id);
+  if (p.ap < 1 || p.foundation >= 3) return false;
+  spend(id, 1); p.foundation++;
+  SFX.build(); pushLog(p.name + ' 修了第 ' + p.foundation + ' 层地基。');
+  draw(); return true;
+}
+async function actFlag(id) {
+  const p = P(id);
+  if (p.ap < 1 || p.flag || p.foundation < 3) return false;
+  spend(id, 1); p.flag = true;
+  SFX.plant(); pushLog(p.name + ' 插上了旗。');
+  draw(); return true;
+}
+async function actCannon(id) {
+  const p = P(id);
+  if (p.ap < 1 || !p.flag || p.cannons.length >= 6) return false;
+  spend(id, 1); p.cannons.push('single');
+  SFX.build(); pushLog(p.name + ' 造了一门单管炮（共 ' + p.cannons.length + ' 门）。');
+  draw(); return true;
+}
+async function actUpgrade(id) {
+  const p = P(id);
+  const i = p.cannons.indexOf('single');
+  if (p.ap < 1 || i < 0) return false;
+  spend(id, 1); p.cannons[i] = 'double';
+  SFX.build(); pushLog(p.name + ' 把单管炮升级成了双管炮（一炮 2 点，只砸一个目标）。');
+  draw(); return true;
+}
+
+/* ---------------- 门 ---------------- */
+/* 对方可以随时花点数把门关上（2 点连上锁一起做） */
+async function defend(defId, d) {
+  const def = P(defId);
+  if (!def || !def.alive || def.ap < 1 || !d || !d.open) return false;
+  if (!canClose(defId, d)) return false;       // 只有该关这道门的人才能救火
+  let ch = def.isAI ? aiReact(def, d) : await askReact(def, d);
+  if (ch === 2 && def.ap < 2) ch = 1;
+  if (ch !== 1 && ch !== 2) return false;
+  spend(def.id, ch);
+  d.open = false;
+  if (ch === 2) { d.locked = true; pushLog(def.name + ' 花 2 点关门并上锁！', 'lgood'); }
+  else pushLog(def.name + ' 花 1 点抢先把门关上了！', 'lgood');
+  SFX.lock(); draw(); renderSeats();
+  return true;
+}
+/* 这道门被推开后，谁最吃亏：他可以马上花点数把门关上 */
+function doorGuard(d, opener) {
+  // 炮门被推开 = 三管炮露了底：占着中心的那家可以把门关回去
+  if (d.kind === 'cannon') return (S.center.owner !== null && S.center.owner !== opener) ? S.center.owner : null;
+  // 侧门 / 内门：门画在谁地盘上，谁挨打，谁关门
+  return d.owner;
+}
+/* 开对方的门（自己的内门也可以自己开） */
+async function actOpenDoor(id, d) {
+  const p = P(id);
+  if (p.ap < 1 || !canOpen(id, d)) return false;
+  spend(id, 1);
+  d.open = true;
+  SFX.open();
+  if (d.kind === 'center') pushLog(p.name + ' 推开了 ' + P(d.owner).name + ' 朝中心的内门。');
+  else if (d.kind === 'cannon') pushLog(d.target === id
+    ? (p.name + ' 推开了三管炮朝自己那扇炮门。')
+    : (p.name + ' 推开了三管炮朝 ' + P(d.target).name + ' 的炮门。'));
+  else pushLog(p.name + ' 打开了 ' + P(d.owner).name + ' 的门。');
+  draw(); renderSeats();
+  const g = doorGuard(d, id);
+  if (g !== null && g !== undefined && g !== id && P(g).alive) { await sleep(240); await defend(g, d); }
+  draw();
+  return true;
+}
+async function actUnlockDoor(id, d) {
+  const p = P(id);
+  if (p.ap < 1 || !canUnlock(id, d)) return false;
+  spend(id, 1); d.locked = false;
+  SFX.open();
+  if (d.kind === 'center') pushLog(d.owner === id
+    ? (p.name + ' 开掉了自己内门上的锁。')
+    : (p.name + ' 撬开了 ' + P(d.owner).name + ' 内门的锁。'));
+  else if (d.kind === 'cannon') pushLog(d.target === id
+    ? (p.name + ' 开掉了三管炮朝自己那扇炮门的锁。')
+    : (p.name + ' 撬开了三管炮朝 ' + P(d.target).name + ' 的炮门的锁。'));
+  else pushLog(d.owner === id ? (p.name + ' 开掉了自己门上的锁。') : (p.name + ' 撬开了 ' + P(d.owner).name + ' 门上的锁。'));
+  draw(); return true;
+}
+async function actCloseDoor(id, d) {
+  const p = P(id);
+  if (p.ap < 1 || !canClose(id, d)) return false;
+  spend(id, 1); d.open = false;
+  SFX.lock();
+  if (d.kind === 'center') pushLog(d.owner === id ? (p.name + ' 关上了自己通往中心的内门。') : (p.name + ' 关上了 ' + P(d.owner).name + ' 通往中心的内门。'));
+  else if (d.kind === 'cannon') pushLog(p.name + ' 关上了三管炮朝 ' + P(d.target).name + ' 的炮门。');
+  else pushLog(d.owner === id ? (p.name + ' 关上了自己的门。') : (p.name + ' 关上了占领区里 ' + P(d.owner).name + ' 的门。'));
+  draw(); return true;
+}
+async function actLockDoor(id, d) {
+  const p = P(id);
+  if (p.ap < 1 || !canLock(id, d)) return false;
+  spend(id, 1); d.locked = true;
+  SFX.lock();
+  if (d.kind === 'center') pushLog(d.owner === id ? (p.name + ' 给自己通往中心的内门上了锁。') : (p.name + ' 锁住了 ' + P(d.owner).name + ' 通往中心的内门。'));
+  else if (d.kind === 'cannon') pushLog(d.target === id
+    ? (p.name + ' 给三管炮朝自己那扇炮门上了锁。')
+    : (p.name + ' 给三管炮朝 ' + P(d.target).name + ' 的炮门上了锁。'));
+  else pushLog(d.owner === id ? (p.name + ' 给自己的门上了锁。') : (p.name + ' 给占领区里 ' + P(d.owner).name + ' 的门上了锁。'));
+  draw(); return true;
+}
+
+/* ---------------- 开炮 ---------------- */
+async function fireVolley(att, cannon, targets) {
+  const a = P(att);
+  if (!a.alive || a.ap < 1) return false;
+  if (cannon === 'center') { if (S.center.owner !== att) return false; }
+  else if (a.cannons.indexOf(cannon) < 0) return false;
+
+  const hits = cannon === 'single' ? 1 : (cannon === 'double' ? 2 : 3);  // 单管 1 / 双管 2 / 三管 3 点
+  spend(att, 1);
+  const label = cannon === 'center' ? '中心三管炮' : (cannon === 'double' ? '双管炮' : '单管炮');
+  pushLog(a.name + ' 用' + label + '开火' + (hits > 1 ? '（盯着一个目标砸 ' + hits + ' 点，伤害不溢出）' : '') + '。');
+
+  let dealt = 0;
+  for (const t of targets) {
+    const target = P(t);
+    if (!target.alive) continue;
+    const d = shotDoor(att, t, cannon === 'center');
+    if (!d) { pushLog('  ' + target.name + ' 的门关着，这一发落空。'); continue; }
+    if (await defend(t, d)) continue;
+    dealt += applyHits(t, att, hits);
+    await sleep(240);
+    break;                                        // 一轮只打一个目标
+  }
+  if (!dealt) {
+    // 一发都没落到人身上（门被关了 / 没撬开）：不扣行动点，本回合还能继续动
+    P(att).ap++; renderSeats();
+    pushLog('这轮一发没打中，行动点不消耗。', 'lgood');
+  }
+  draw(); renderSeats();
+  return true;
+}
+
+/* 中心三管炮只能被占领，打不掉；占领以插旗为标识 */
+async function fireAtCenter(att) {
+  const p = P(att);
+  const d = doorOf(att, 'center');
+  if (!canTakeCenter(att) || p.ap < 1) return false;
+  spend(att, 1);
+  const prev = S.center.owner;
+  S.center.owner = att;
+  // 占领不改动周围门的开关状态（照原样保留）
+  SFX.plant(); boom(CX, CY, p.color);
+  pushLog(prev === null
+    ? ('★ ' + p.name + ' 一炮拿下中心的三管炮！')
+    : ('★ ' + p.name + ' 从 ' + P(prev).name + ' 手里夺下了三管炮！'), 'lgood');
+  draw(); renderSeats();
+  return true;
+}
+
+/* ---------------- 特效 ---------------- */
+function boom(x, y, color) {
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 1.6 + Math.random() * 4.4;
+    FX.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, color: color || INK, r: 3 + Math.random() * 5 });
+  }
+  FX.push({ ring: true, x, y, r: 8, life: 1, color: color || INK });
+}
+function stepFX() {
+  ctx.save();
+  for (const f of FX) {
+    if (f.ring) {
+      ctx.globalAlpha = f.life * 0.8; ctx.strokeStyle = f.color; ctx.lineWidth = 5 * f.life;
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.stroke();
+      f.r += 6; f.life -= 0.045;
+    } else {
+      ctx.globalAlpha = f.life * 0.9; ctx.fillStyle = f.color;
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r * f.life, 0, Math.PI * 2); ctx.fill();
+      f.x += f.vx; f.y += f.vy; f.vy += 0.16; f.life -= 0.028;
+    }
+  }
+  ctx.restore();
+  FX = FX.filter(f => f.life > 0);
+}
+
+/* =======================================================================
+   3. 渲染
+   ======================================================================= */
+function draw() {
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  ctx.clearRect(0, 0, 1000, 1000);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1000, 1000);
+
+  drawTints();
+  drawWalls();
+  for (let i = 0; i < S.n; i++) drawTerritory(i);
+  if (hasCenter()) drawCenter();
+  drawDoors();
+  drawHighlights();
+}
+function drawTints() {
+  for (let i = 0; i < S.n; i++) {
+    const p = P(i);
+    if (!p.alive) {
+      // 打下来的地盘：铺上占领者的底色
+      const cz = conquerorOf(i);
+      if (cz === null) continue;
+      territoryPath(i);
+      ctx.fillStyle = TINTS2[cz];
+      ctx.fill();
+      continue;
+    }
+    territoryPath(i);
+    ctx.fillStyle = p.tint;
+    ctx.fill();
+  }
+  if (S.turnPlayer !== null) {
+    const id = S.turnPlayer;
+    territoryPath(id);
+    ctx.fillStyle = 'rgba(109,42,134,0.10)';
+    ctx.fill();
+  }
+}
+function drawWalls() {
+  sCircle(CX, CY, R, 4.6);
+  if (S.n === 2) {
+    const gap = 46;
+    sLine(CX, CY - R + 6, CX, CY - gap, 4.4);
+    sLine(CX, CY + gap, CX, CY + R - 6, 4.4);
+    return;
+  }
+  const cfg = M();
+  if (cfg.center) {
+    // 中心圈的外壁，留出每道内门的缺口
+    const gapDeg = (0.11 * R) / RIN / D2R;
+    const mids = cfg.mid.slice().sort((a, b) => a - b);
+    for (let k = 0; k < mids.length; k++) {
+      const a0 = mids[k] + gapDeg;
+      const a1 = (k + 1 === mids.length ? mids[0] + 360 : mids[k + 1]) - gapDeg;
+      sArc(CX, CY, RIN, a0, a1, 4.4);
+    }
+  }
+  for (let i = 0; i < S.n; i++) {
+    const deg = cfg.mid[i] + cfg.half;
+    const m = (RIN + R) / 2, gap = 20;
+    const p0 = pol(CX, CY, RIN, deg), p1 = pol(CX, CY, R, deg);
+    sLine(p0[0], p0[1], CX + (m - gap) * Math.cos(deg * D2R), CY + (m - gap) * Math.sin(deg * D2R), 4.4);
+    sLine(CX + (m + gap) * Math.cos(deg * D2R), CY + (m + gap) * Math.sin(deg * D2R), p1[0], p1[1], 4.4);
+  }
+}
+function drawTerritory(id) {
+  const p = P(id), fr = territoryFrame(id);
+  if (!p.alive) { drawGhost(id); return; }
+  ctx.save();
+  territoryPath(id); ctx.clip();
+  for (let k = 0; k < p.foundation; k++) {
+    const r = fr.arcR[k];
+    if (fr.kind === 'half') {
+      const ha = Math.acos(Math.min(1, r / (2 * R))) / D2R;
+      sArc(fr.arcCenter[0], fr.arcCenter[1], r, fr.fa - ha, fr.fa + ha, 4.0);
+    } else if (fr.kind === 'wedge') {
+      // 扇形战场：梯田式的地基弧留一点缝，免得三家接成一整圈像"中心圈"
+      sArc(CX, CY, r, fr.mid - fr.half + 3, fr.mid + fr.half - 3, 4.0);
+    } else {
+      sArc(CX, CY, r, fr.mid - fr.half, fr.mid + fr.half, 4.0);
+    }
+  }
+  ctx.restore();
+
+  const total = Math.max(1, (p.flag ? 1 : 0) + p.cannons.length);
+  const off0 = p.flag ? 1 : 0;
+  const slots = slotsOf(id, total);
+  if (p.flag) drawFlag(slots[0][0], slots[0][1], p);
+  for (let i = 0; i < p.cannons.length; i++) {
+    const s = slots[i + off0];
+    if (!s) break;
+    drawCannon(s[0], s[1], slotAngle(id, i + off0, total), p.cannons[i], p.color);
+  }
+  const lp = fr.kind === 'half'
+    ? [fr.back[0] + fr.f[0] * R * 0.42, fr.back[1] + fr.f[1] * R * 0.42]
+    : pol(CX, CY, R * 0.96, fr.mid);
+  ctx.save();
+  ctx.fillStyle = p.color;
+  ctx.font = 'bold 22px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(p.name, lp[0], lp[1]);
+  ctx.restore();
+}
+function drawGhost(id) {
+  ctx.save();
+  ctx.globalAlpha = 0.22; ctx.setLineDash([10, 12]);
+  territoryPath(id); ink(3.4); ctx.stroke();
+  ctx.restore();
+  const cz = conquerorOf(id);
+  if (cz === null) return;
+  // 这块废墟现在归谁：虚线框 + 一面小旗
+  ctx.save();
+  ctx.globalAlpha = 0.85; ctx.setLineDash([5, 8]);
+  territoryPath(id); ink(3, P(cz).color); ctx.stroke();
+  ctx.restore();
+  const fr = territoryFrame(id);
+  const at = fr.kind === 'half'
+    ? [fr.back[0] + fr.f[0] * R * 0.30, fr.back[1] + fr.f[1] * R * 0.30]
+    : pol(CX, CY, R * 0.80, fr.mid);
+  ctx.save();
+  ctx.fillStyle = P(cz).color;
+  ctx.font = 'bold 16px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('⚑ ' + P(cz).name + ' 的占领区', at[0], at[1]);
+  ctx.restore();
+}
+function drawFlag(x, y, p, scale) {
+  const s = scale || 1, h = 46 * s;
+  ctx.save();
+  fillPoly([[x, y - h], [x + 30 * s, y - h * 0.66], [x, y - h * 0.30]], p.color);
+  sPoly([[x, y - h], [x + 30 * s, y - h * 0.66], [x, y - h * 0.30]], 3.6 * s, true);
+  sLine(x, y - h - 3 * s, x, y + 13 * s, 4.2 * s);
+  ctx.restore();
+}
+function drawCannon(x, y, ang, type, color) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(ang);
+  const L = 40, W = 13;
+  const barrels = type === 'double' ? [-1, 1] : [0];
+  const off = type === 'double' ? 10 : 0;
+  for (const b of barrels) {
+    const oy = b * off;
+    fillPoly([[0, oy - W / 2], [L, oy - W / 2], [L, oy + W / 2], [0, oy + W / 2]], 'rgba(255,255,255,0.95)');
+    sPoly([[-2, oy - W / 2], [L, oy - W / 2], [L, oy + W / 2], [-2, oy + W / 2]], 3.6, true);
+    sArc(L, oy, W / 2, -90, 90, 3.4);
+  }
+  fillPoly([[-10, -W], [-10, W], [4, W], [4, -W]], 'rgba(255,255,255,0.95)');
+  sPoly([[-10, -W], [-10, W], [4, W], [4, -W]], 3.6, true);
+  ctx.restore();
+}
+/* 门：一块门板。关着=横在墙上，开着=转开（绿），锁上=多一把挂锁 */
+function drawDoors() {
+  for (const d of S.doors) {
+    const p = doorPos(d);
+    // 中心那两扇门没有玩家主人：跟着三管炮的旗色走
+    const dcol = d.owner === 'center'
+      ? (S.center.owner !== null ? P(S.center.owner).color : INK)
+      : P(d.owner).color;
+    const axis = doorAxis(d) * D2R;
+    const L = (d.kind === 'center' || d.kind === 'cannon') ? 30 : 34, TH = 9;
+    const ang = d.open ? axis + 1.22 : axis;
+    const col = d.open ? GREEN : dcol;
+    const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx;
+    const pts = [
+      [p[0] - dx * L / 2 - nx * TH / 2, p[1] - dy * L / 2 - ny * TH / 2],
+      [p[0] + dx * L / 2 - nx * TH / 2, p[1] + dy * L / 2 - ny * TH / 2],
+      [p[0] + dx * L / 2 + nx * TH / 2, p[1] + dy * L / 2 + ny * TH / 2],
+      [p[0] - dx * L / 2 + nx * TH / 2, p[1] - dy * L / 2 + ny * TH / 2]
+    ];
+    fillPoly(pts, d.open ? '#e9f8ef' : '#ffffff');
+    sPoly(pts, 3.4, true, col);
+    if (d.open) {  // 门开着也要认得出是谁家的门
+      ctx.save();
+      ctx.beginPath(); ctx.arc(p[0], p[1], 3.6, 0, Math.PI * 2);
+      ctx.fillStyle = dcol; ctx.fill();
+      ctx.restore();
+    }
+    if (d.locked) drawPadlock(p, dcol);
+  }
+}
+/* 挂锁画在门板正中，锁钩朝上（不跟着门板转，免得倒过来） */
+function drawPadlock(p, col) {
+  ctx.save();
+  ctx.translate(p[0], p[1]);
+  ctx.strokeStyle = col; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(0, -11, 6.5, Math.PI, 0); ctx.stroke();
+  ctx.beginPath(); ctx.rect(-9, -6, 18, 14); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 1, 2.6, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
+  ctx.restore();
+}
+/* 中心唯一的三管炮：只能被占领，不能被击破 */
+function drawCenter() {
+  const owner = S.center.owner;
+  if (owner !== null) {
+    ctx.save();
+    ctx.globalAlpha = 0.10 + 0.08 * (0.5 + 0.5 * Math.sin(performance.now() / 500));
+    ctx.beginPath(); ctx.arc(CX, CY, RIN * 0.92, 0, Math.PI * 2);
+    ctx.fillStyle = P(owner).color; ctx.fill();
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.translate(CX, CY);
+  const h = 12;
+  for (let i = -1; i <= 1; i++) {
+    const y = i * (h + 3);
+    fillPoly([[-22, y - h / 2], [26, y - h / 2], [26, y + h / 2], [-22, y + h / 2]], 'rgba(255,255,255,0.95)');
+    sPoly([[-22, y - h / 2], [26, y - h / 2], [26, y + h / 2], [-22, y + h / 2]], 3.4, true);
+  }
+  sPoly([[-30, -30], [-30, 30], [-16, 30], [-16, -30]], 3.6, true);
+  ctx.restore();
+  if (owner !== null) drawFlag(CX, CY - RIN * 0.30, P(owner), 0.9);
+  ctx.save();
+  ctx.fillStyle = INK;
+  ctx.font = 'bold 15px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('三管炮', CX, CY + 62);
+  if (owner !== null) {
+    ctx.fillStyle = P(owner).color;
+    ctx.fillText(P(owner).name + ' 插旗占领', CX, CY + 80);
+  }
+  ctx.restore();
+}
+function drawHighlights() {
+  if (!S.pending) return;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 240);
+  ctx.save();
+  ctx.globalAlpha = 0.4 + 0.5 * pulse;
+  ctx.strokeStyle = GREEN; ctx.lineWidth = 4;
+  for (const d of (S.pending.doors || [])) {
+    const p = doorPos(d);
+    ctx.beginPath(); ctx.arc(p[0], p[1], 28 + 5 * pulse, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 6; ctx.setLineDash([14, 10]);
+  for (const id of (S.pending.targets || [])) {
+    territoryPath(id); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* =======================================================================
+   4. 石头剪刀布 / 回合 / 电脑
+   ======================================================================= */
+const HANDS = ['rock', 'scissors', 'paper'];
+const HAND_CN = { rock: '锤子', scissors: '剪刀', paper: '布' };
+const HAND_EMOJI = { rock: '✊', scissors: '✌️', paper: '🖐️' };
+function beats(a, b) {
+  return (a === 'rock' && b === 'scissors') || (a === 'scissors' && b === 'paper') || (a === 'paper' && b === 'rock');
+}
+function resolveRPS(ch, list) {
+  const ids = list.map(p => p.id);
+  let best = null, bs = -Infinity, tie = false;
+  for (const i of ids) {
+    let sc = 0;
+    for (const j of ids) {
+      if (i === j) continue;
+      if (beats(ch[i], ch[j])) sc++; else if (beats(ch[j], ch[i])) sc--;
+    }
+    if (sc > bs) { bs = sc; best = i; tie = false; }
+    else if (sc === bs) tie = true;
+  }
+  return (tie || bs <= 0) ? null : best;
+}
+function aiRPS() { return HANDS[Math.floor(Math.random() * 3)]; }
+
+async function rpsPhase(list) {
+  while (true) {
+    S.phase = 'rps';
+    const ch = {};
+    for (const p of list) if (p.isAI) ch[p.id] = aiRPS();
+    for (const p of list) if (!p.isAI) ch[p.id] = await askHumanRPS(p);
+    let w;
+    if (list.length === 1) w = list[0].id;
+    else w = resolveRPS(ch, list);
+    await showReveal(ch, w, list);
+    if (w === null || w === undefined) {
+      pushLog('平局，重来一局石头剪刀布。');
+      await sleep(500);
+      continue;
+    }
+    P(w).ap++;
+    pushLog(P(w).name + ' 赢了！获得 1 个行动点。', 'lgood');
+    SFX.plant(); renderSeats();
+    await sleep(260);
+    return w;
+  }
+}
+function askHumanRPS(p) {
+  return new Promise(res => {
+    const ov = document.getElementById('modalOverlay');
+    const pn = document.getElementById('modalPanel');
+    pn.innerHTML =
+      '<h2>石头 剪刀 布</h2>' +
+      '<p><b style="color:' + p.color + '">' + p.name + '</b> 出拳 —— 赢了得 1 个行动点</p>' +
+      '<p style="font-size:11.5px">快捷键：<kbd>1</kbd> 锤子 &nbsp; <kbd>2</kbd> 剪刀 &nbsp; <kbd>3</kbd> 布</p>' +
+      '<div class="rpsRow">' +
+      HANDS.map(h => '<button class="rpsBtn" data-h="' + h + '"><span class="rpsHand">' + HAND_EMOJI[h] + '</span>' + HAND_CN[h] + '</button>').join('') +
+      '</div>';
+    ov.classList.remove('hidden');
+    // 刚弹出来的这一小会儿不接收输入：防止手快连点（或按住快捷键）把下一个人的拳也一起出了
+    const openedAt = performance.now();
+    S.rpsResolver = h => {
+      if (performance.now() - openedAt < 130) return;
+      S.rpsResolver = null; ov.classList.add('hidden'); res(h);
+    };
+    pn.querySelectorAll('.rpsBtn').forEach(b => b.onclick = () => {
+      SFX.click(); if (S.rpsResolver) S.rpsResolver(b.dataset.h);
+    });
+  });
+}
+function showReveal(ch, w, list) {
+  return new Promise(res => {
+    const ov = document.getElementById('modalOverlay');
+    const pn = document.getElementById('modalPanel');
+    const rows = list.map(p =>
+      '<div style="font-size:15px;margin:6px 0;padding:6px 10px;border-radius:10px;' +
+      (w === p.id ? 'background:#e6f7ec;border:2px solid #2f9e5f' : 'border:2px solid #ddd') + '">' +
+      '<b style="color:' + p.color + '">' + p.name + '</b> 出了 <span style="font-size:24px">' + HAND_EMOJI[ch[p.id]] + '</span> ' + HAND_CN[ch[p.id]] +
+      (w === p.id ? ' &nbsp;<b style="color:#2f9e5f">胜 +1 行动点</b>' : '') + '</div>').join('');
+    pn.innerHTML = '<h2>开 拳</h2>' + rows + '<p>' + (w === null ? '平局，再来一次' : '') + '</p>';
+    ov.classList.remove('hidden');
+    setTimeout(() => { ov.classList.add('hidden'); res(); }, w === null ? 1000 : 1200);
+  });
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function turnPhase(id) {
+  S.phase = 'turn';
+  S.turnPlayer = id;
+  renderSeats(); renderButtons(); draw();
+  if (P(id).isAI) await aiTurn(id);
+  else await waitHuman(id);
+  S.turnPlayer = null; S.pending = null;
+  renderSeats(); renderButtons(); draw();
+}
+function waitHuman(id) { return new Promise(res => { S.awaiting = { id, res }; }); }
+function endTurn() { if (S.awaiting) { const a = S.awaiting; S.awaiting = null; a.res(); } }
+/* 人类玩家把行动点花光 → 本回合自动结束，不用再点「结束回合」 */
+function autoEndTurn() {
+  if (!S || S.phase !== 'turn' || S.turnPlayer === null || !S.awaiting) return;
+  const id = S.turnPlayer;
+  if (P(id).isAI || P(id).ap > 0) return;
+  pushLog(P(id).name + ' 的行动点用完了，本回合结束。');
+  endTurn();
+}
+
+/* ---------------- 电脑 ---------------- */
+function aiReact(d, door) {
+  if (!d || d.ap < 1) return 0;
+  if (d.foundation <= 1) return d.ap >= 2 ? 2 : 1;
+  if (d.ap >= 3) return 2;
+  if (d.ap >= 2) return Math.random() < 0.8 ? 2 : 1;
+  return Math.random() < 0.55 ? 1 : 0;
+}
+/* 现在就能开炮打人吗（决定要不要把点数用干净） */
+function canShootNow(id) {
+  if (normalTargets(id).length) return P(id).cannons.length > 0;
+  return hasCenter() && S.center.owner === id && centerReach(id).length > 0;
+}
+async function aiTurn(id) {
+  let guard = 0;
+  while (P(id).ap > 0 && P(id).alive && guard++ < 14) {
+    const did = await aiStep(id);
+    if (!did) break;
+    // 手里只剩 1 点、又打不到人：留着备用（对方来开门时能花 1 点把门关上）
+    if (P(id).ap <= 1 && !canShootNow(id)) break;
+    await sleep(600);
+  }
+  await sleep(300);
+}
+async function aiStep(id) {
+  const p = P(id);
+  const enemies = alive().filter(q => q.id !== id);
+  if (!enemies.length || p.ap < 1) return false;
+
+  if (p.foundation < 3) return actBuild(id);
+  if (!p.flag) return actFlag(id);
+  if (p.cannons.length === 0) return actCannon(id);
+  // 我方的门被对方开着 —— 有挨打的威胁，得留点数救火
+  const threat = enemies.some(e => { const d = doorOf(id, e.id); return d && d.open; });
+
+  // 中间的三管炮：没人占就抢先插旗；别人占着，得手上没活、点数又宽裕才去抢
+  if (hasCenter() && S.center.owner !== id && p.cannons.length > 0) {
+    const cd = doorOf('center', id);
+    if (cd) {
+      const cost = (cd.locked ? 1 : 0) + (cd.open ? 0 : 1) + 1;
+      const busy = normalTargets(id).length > 0;      // 手上有现成的靶子就先打靶子
+      const free = S.center.owner === null;
+      if ((free || (!busy && p.ap >= cost + 1)) && p.ap >= cost) {
+        if (cd.locked) return actUnlockDoor(id, cd);
+        if (!cd.open) return actOpenDoor(id, cd);
+        return fireAtCenter(id);
+      }
+      // 空着的中枢值得攒点，别把点数浪费在小事上
+      if (free && !threat && p.ap < cost) return false;
+    }
+  }
+  // 升级单管炮 / 补炮
+  if (p.cannons.indexOf('single') >= 0 && p.cannons.indexOf('double') < 0 && p.ap >= 2) return actUpgrade(id);
+  if (p.cannons.length < 2 && p.ap >= 2) return actCannon(id);
+  // 已经占着中心：三管炮够得着谁就打谁（够得着 = 三管炮朝那家的炮门开着）
+  if (hasCenter() && S.center.owner === id) {
+    const ct = centerReach(id).sort((a, b) => playerHits(P(a)) - playerHits(P(b)));
+    if (ct.length && p.ap >= 1) return fireVolley(id, 'center', [ct[0]]);
+    // 够不着：把最弱那家朝中心的内门推开，下一轮就有靶子
+    if (p.ap >= 2) {
+      const cd = enemies.slice().sort((a, b) => playerHits(a) - playerHits(b))
+        .map(q => doorOf(q.id, 'center')).filter(Boolean);
+      const lk = cd.filter(d => d.locked);
+      if (lk.length) return actUnlockDoor(id, lk[0]);
+      const sh = cd.filter(d => !d.open);
+      if (sh.length) return actOpenDoor(id, sh[0]);
+    }
+    // 守着中心：把别人朝三管炮的炮门锁上，谁来抢都得多花 1 点
+    const gd = S.doors.filter(d => d.kind === 'cannon' && d.target !== id && !d.locked && !d.open);
+    if (gd.length && p.ap >= 2) return actLockDoor(id, gd[0]);
+  }
+  // 门已经开着的，直接打
+  const tg = normalTargets(id);
+  if (tg.length) {
+    tg.sort((a, b) => playerHits(P(a)) - playerHits(P(b)));
+    const c = bestCannon(id);
+    if (c) return fireVolley(id, c, [tg[0]]);
+  }
+  // 去开最弱那家的门（自家地界、占领区、中间阵位都行）
+  for (const en of enemies.slice().sort((a, b) => playerHits(a) - playerHits(b))) {
+    const zs = zonesOf(id);
+    const cand = S.doors.filter(d => d.owner === en.id && zs.indexOf(d.target) >= 0);
+    for (const d of cand) {
+      if (d.locked && p.ap >= 2) return actUnlockDoor(id, d);
+      if (!d.open && !d.locked && p.ap >= 2) return actOpenDoor(id, d);
+    }
+  }
+  // 门开着就顺手关上，然后上锁
+  const op = closeTargets(id);
+  if (op.length && p.ap >= 1) return actCloseDoor(id, op[0]);
+  const mine = lockTargets(id);
+  if (mine.length && p.ap >= 2 && Math.random() < 0.7) return actLockDoor(id, mine[0]);
+  return false;
+}
+
+/* =======================================================================
+   5. 主循环
+   每轮所有人一起石头剪刀布，赢家行动；行动点花光就自动结束本回合
+   ======================================================================= */
+async function gameLoop() {
+  while (true) {
+    if (checkOver()) break;
+    S.round++;
+
+    const w = await rpsPhase(alive());
+    if (checkOver()) break;
+    await turnPhase(w);
+  }
+  renderButtons();
+}
+
+/* =======================================================================
+   6. 界面
+   ======================================================================= */
+function renderSeats() {
+  const el = document.getElementById('seats');
+  el.innerHTML = S.players.map(p => {
+    const pips = p.ap > 0
+      ? '<span class="pip on"></span>'.repeat(Math.min(p.ap, 6)) + (p.ap > 6 ? '<span class="badge">+' + (p.ap - 6) + '</span>' : '')
+      : '<span class="pip"></span>';
+    const dbl = p.cannons.filter(c => c === 'double').length, sgl = p.cannons.filter(c => c === 'single').length;
+    const cn = p.cannons.length ? ('炮' + sgl + (dbl ? '·双' + dbl : '')) : '';
+    return '<div class="seat' + (S.turnPlayer === p.id ? ' active' : '') + (p.alive ? '' : ' dead') + '">' +
+      '<span class="dot" style="background:' + p.color + '"></span>' +
+      '<span class="seatName">' + p.name + (p.isAI ? ' <span class="badge">电脑</span>' : '') + '</span>' +
+      '<span class="badge">地基' + p.foundation + '/3</span>' +
+      '<span class="icons">' + (p.flag ? '🚩' : '<span style="opacity:.25">🚩</span>') +
+      '<span class="badge">' + (cn || '无炮') + '</span></span>' +
+      '<span class="ap" title="行动点">' + pips + '</span>' +
+
+      (conqueredCount(p.id) ? '<span class="badge">占地 ' + conqueredCount(p.id) + '</span>' : '') +
+      (hasCenter() && S.center.owner === p.id ? '<span class="badge" style="border-color:' + p.color + ';color:' + p.color + '">三管</span>' : '') +
+      '</div>';
+  }).join('');
+}
+function renderLog() {
+  document.getElementById('log').innerHTML = S.log.map(l => '<div class="' + l.cls + '">' + l.t + '</div>').join('');
+}
+function setPending(p) { S.pending = p; renderButtons(); draw(); }
+function clearPending() { S.pending = null; renderButtons(); draw(); }
+
+function renderButtons() {
+  const box = document.getElementById('buttons');
+  const hint = document.getElementById('hint');
+  if (!S || S.phase === 'over') { box.innerHTML = ''; hint.textContent = '战斗结束。'; return; }
+  if (S.phase !== 'turn' || S.turnPlayer === null) { box.innerHTML = ''; hint.textContent = '石头剪刀布决定谁先动……'; return; }
+  const id = S.turnPlayer, p = P(id);
+  if (p.isAI) { box.innerHTML = ''; hint.innerHTML = '<b>' + p.name + '</b> 正在思考（剩余 ' + p.ap + ' 个行动点）'; return; }
+
+  if (S.pending) {
+    const pd = S.pending;
+    const names = { open: '开 门', unlock: '开 锁', close: '关 门', lock: '上 锁', fire: '开 炮' };
+    hint.innerHTML = '已进入 <b>' + names[pd.kind] + '</b> 模式：' +
+      (pd.kind === 'fire' ? '点对方领地选一个目标。' : '点棋盘上闪烁的门。') +
+      (pd.tip ? '<br><span style="font-size:11.5px;color:#9b6bb1">' + pd.tip + '</span>' : '');
+    box.innerHTML = '<button id="btnCancel">取消</button>';
+    document.getElementById('btnCancel').onclick = clearPending;
+    return;
+  }
+
+  const btns = [];
+  const push = (label, fn, primary, disabled) => btns.push({ label, fn, primary, disabled });
+
+  if (p.foundation < 3) push('修地基 ' + p.foundation + '/3', () => actBuild(id), true);
+  if (p.foundation >= 3 && !p.flag) push('插旗', () => actFlag(id), true);
+  if (p.flag && p.cannons.length < 6) push('造炮', () => actCannon(id));
+  if (p.cannons.indexOf('single') >= 0) push('升级双管炮', () => actUpgrade(id));
+
+  const ot = openTargets(id), ut = unlockTargets(id), ct = closeTargets(id), lt = lockTargets(id);
+  /* 门上的动作统一成四个词：开门 / 关门 / 上锁 / 开锁。
+     在哪个门上点，棋盘上会闪出来，所以按钮不再分"自己的 / 占领区的 / 三管炮的"。 */
+  const doorBtn = (arr, label, kind, tip) => {
+    if (arr.length) push(label, () => setPending({ kind, doors: arr, tip }));
+  };
+  doorBtn(ot, '开门', 'open', '把对手朝我方地盘的门推开：开门图标落在对方领地上，推开了才打得到他。');
+  doorBtn(ut, '开锁', 'unlock', '开掉门上的锁（自家的锁、对手朝我方地盘的锁、三管炮炮门的锁都在这儿）。');
+  doorBtn(ct, '关门', 'close', '把开着的门关上，这一炮就落空。');
+  doorBtn(lt, '上锁', 'lock', '给关着的门加锁：对手得先开锁再开门，多花 1 点。');
+
+  const tg = normalTargets(id);
+  if (p.cannons.indexOf('single') >= 0 && tg.length)
+    push('开炮·单管', () => setPending({ kind: 'fire', cannon: 'single', need: 1, hits: [], targets: tg, tip: '单管炮：挑一个目标，打掉 1 个建筑。' }), true);
+  if (p.cannons.indexOf('double') >= 0 && tg.length)
+    push('开炮·双管', () => setPending({ kind: 'fire', cannon: 'double', need: 1, hits: [], targets: tg, tip: '双管炮：只挑一个目标点一次，直接砸 2 点伤害（伤害不溢出）。' }), true);
+  const cr = (hasCenter() && S.center.owner === id) ? centerReach(id) : [];
+  if (cr.length)
+    push('三管炮开火', () => setPending({ kind: 'fire', cannon: 'center', need: 1, hits: [], targets: cr, tip: '三管炮：只挑一个目标点一次，直接砸 3 点伤害（伤害不溢出）。' }), true);
+  if (canTakeCenter(id))
+    push(S.center.owner === null ? '占领三管炮' : '夺取三管炮', () => fireAtCenter(id), true);
+
+  push('结束回合', endTurn, false);
+
+  hint.innerHTML = '<b style="color:' + p.color + '">' + p.name + '</b> 的回合 · 剩余 <b>' + p.ap + '</b> 个行动点。' +
+    (p.ap === 1 ? '<br><span style="color:#b3402f">用完这 1 点，本回合自动结束。</span>' : '');
+  box.innerHTML = btns.map((b, i) => '<button data-i="' + i + '" class="' + (b.primary ? 'primary' : '') + '"' + (b.disabled ? ' disabled' : '') + '>' + b.label + '</button>').join('') +
+    '<span style="font-size:11.5px;color:#9b6bb1;align-self:center">每个动作消耗 1 行动点</span>';
+  box.querySelectorAll('button[data-i]').forEach(el => {
+    el.onclick = () => {
+      const b = btns[+el.dataset.i]; SFX.click();
+      Promise.resolve(b.fn()).then(() => { renderButtons(); renderSeats(); renderLog(); autoEndTurn(); });
+    };
+  });
+}
+
+/* ---------------- 点击棋盘 ---------------- */
+function canvasPos(e) {
+  const r = cvs.getBoundingClientRect();
+  return [(e.clientX - r.left) / r.width * 1000, (e.clientY - r.top) / r.height * 1000];
+}
+function hitTerritory(x, y) {
+  const dx = x - CX, dy = y - CY, r = Math.hypot(dx, dy);
+  if (r > R) return null;
+  const deg = (Math.atan2(dy, dx) / D2R + 360) % 360;
+  if (r < RIN) return null;              // 正中间的中心圈是中立区
+  const cfg = M();
+  for (let i = 0; i < S.n; i++) if (inSector(deg, cfg.mid[i], cfg.half)) return i;
+  return null;
+}
+cvs.addEventListener('click', e => {
+  if (!S || S.phase !== 'turn' || !S.pending) return;
+  const [x, y] = canvasPos(e);
+  const pd = S.pending, id = S.turnPlayer;
+  if (pd.kind === 'fire') {
+    const t = hitTerritory(x, y);
+    if (t === null || pd.targets.indexOf(t) < 0) return;
+    pd.hits.push(t); SFX.click();
+    if (pd.hits.length >= pd.need) {
+      const hits = pd.hits.slice(), cannon = pd.cannon;
+      clearPending();
+      fireVolley(id, cannon, hits).then(() => { renderButtons(); renderSeats(); renderLog(); autoEndTurn(); });
+    } else renderButtons();
+    return;
+  }
+  let best = null, bd = 1e9;
+  for (const d of pd.doors) {
+    const q = doorPos(d), dist = Math.hypot(q[0] - x, q[1] - y);
+    if (dist < bd) { bd = dist; best = d; }
+  }
+  if (!best || bd > 52) return;
+  SFX.click();
+  const kind = pd.kind;
+  clearPending();
+  const run = kind === 'open' ? actOpenDoor(id, best)
+    : kind === 'unlock' ? actUnlockDoor(id, best)
+    : kind === 'close' ? actCloseDoor(id, best)
+    : actLockDoor(id, best);
+  run.then(() => { renderButtons(); renderSeats(); renderLog(); autoEndTurn(); });
+});
+
+/* ---------------- 弹窗 ---------------- */
+/* 0 = 不响应，1 = 关门（1 点），2 = 关门并上锁（2 点） */
+function askReact(def, d) {
+  return new Promise(res => {
+    const ov = document.getElementById('modalOverlay');
+    const pn = document.getElementById('modalPanel');
+    pn.innerHTML = '<h2>有人动你的门</h2>' +
+      '<p><b style="color:' + def.color + '">' + def.name + '</b>，' +
+      (d && d.kind === 'center' ? '对手正在打开通往中心的内门，准备抢走你的三管炮。' : '对手正在开你的门，准备打进来。') + '</p>' +
+      '<p>你现在有 <b>' + def.ap + '</b> 个行动点。锁要先关门才能上。</p>' +
+      '<div style="margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
+      '<button class="primary bigBtn" id="r1">花 1 点关门</button>' +
+      (def.ap >= 2 ? '<button class="primary bigBtn" id="r2">花 2 点关门 + 上锁</button>' : '') +
+      '<button class="bigBtn" id="r0">不管</button></div>';
+    ov.classList.remove('hidden');
+    pn.querySelector('#r1').onclick = () => { SFX.click(); ov.classList.add('hidden'); res(1); };
+    if (pn.querySelector('#r2')) pn.querySelector('#r2').onclick = () => { SFX.click(); ov.classList.add('hidden'); res(2); };
+    pn.querySelector('#r0').onclick = () => { SFX.click(); ov.classList.add('hidden'); res(0); };
+  });
+}
+function showResult(w) {
+  const ov = document.getElementById('modalOverlay');
+  const pn = document.getElementById('modalPanel');
+  pn.innerHTML = '<h2>战 斗 结 束</h2>' +
+    '<p style="font-size:17px"><b style="color:' + w.color + '">' + w.name + '</b> 打光了所有对手的地基，守住了阵地。</p>' +
+    '<p>一共打了 ' + S.round + ' 个回合。</p>' +
+    '<div style="margin-top:14px;display:flex;gap:10px;justify-content:center">' +
+    '<button class="primary bigBtn" id="again">再来一局</button>' +
+    '<button class="bigBtn" id="back">回到首页</button></div>';
+  ov.classList.remove('hidden');
+  pn.querySelector('#again').onclick = () => { ov.classList.add('hidden'); startGame(); };
+  pn.querySelector('#back').onclick = () => { ov.classList.add('hidden'); document.getElementById('startOverlay').classList.remove('hidden'); };
+}
+function showRules() {
+  const ov = document.getElementById('modalOverlay');
+  const pn = document.getElementById('modalPanel');
+  pn.innerHTML = '<h2>游 戏 规 则</h2>' +
+    '<div class="rulesGrid">' +
+    '<div><h3>行动点</h3><ul>' +
+    '<li>每一轮所有人一起出 <b>锤子剪刀布</b>，赢的人得 <b>1 个行动点</b>并立刻行动。</li>' +
+    '<li>每个动作消耗 1 个行动点，点数可以留着以后用。</li>' +
+    '<li><b>把行动点用光（归零），本回合自动结束</b>，不用再点「结束回合」。</li>' +
+    '</ul></div>' +
+    '<div><h3>建造顺序</h3><ul>' +
+    '<li>开局<b>没有地基</b>，赢一次修一层，最多 3 层（三层贴着外圈排紧，中间留给旗和炮）。</li>' +
+    '<li>3 层修满可以<b>插旗</b>；有旗才能<b>造炮</b>（先造出来的是单管炮）。</li>' +
+    '<li>单管炮可以升级成 <b>双管炮</b>（顶级，血量和单管一样，一炮就没）。</li>' +
+    '<li>可以一直加炮（最多 6 门），但<b>一次只能用一门</b>。</li>' +
+    '</ul></div>' +
+    '<div><h3>门：开门 / 关门 / 上锁 / 开锁</h3><ul>' +
+    '<li>门一律画在<b>被进攻那家的地盘上</b>：<b>开门的是进攻方，关门 / 上锁的是门的主人</b>。</li>' +
+    '<li><b>开了对方的门才能打对方</b>：花 1 点开对方朝我这边的那扇门，开门图标出现在对方领地上。</li>' +
+    '<li>我开了你的门 ≠ 你能打我。你要打我，得反过来开<b>我的门</b>。</li>' +
+    '<li><b>上锁</b>（1 点）要先<b>关门</b>：对方要打进来就得开锁 → 开门 → 开炮，一共 3 点。</li>' +
+    '<li>对方开了你的门，你可以马上花 1 点关门（把这一炮废掉），或者花 2 点关门 + 上锁。</li>' +
+    '<li><b>画在自己地盘上的门只关不开</b>：自己的门、打下来的占领区里的门，都只能关 / 上锁 / 开锁。</li>' +
+    '</ul></div>' +
+    '<div><h3>开炮 &amp; 淘汰</h3><ul>' +
+    '<li>单管炮一次打掉 <b>1 个建筑</b>。<b>双管炮只挑一个目标点一次，直接砸 2 点伤害</b>（伤害不溢出，打多了就浪费）。</li>' +
+    '<li>顺序固定：<b>先打炮 → 再打旗 → 最后打地基</b>。</li>' +
+    '<li>有地基的，地基被打光就出局（<b>正好打没也算</b>）。</li>' +
+    '<li>本来就没地基的，<b>要挨上一炮才算出局</b>，光没地基不算输。</li>' +
+    '<li><b>一发都没打到人（门被关了 / 锁没开），这一炮不消耗行动点</b>，本回合还能接着动；三管炮同理。</li>' +
+    '</ul></div>' +
+    '<div><h3>多人局 / 占领区</h3><ul>' +
+    '<li>三人、四人是圆环等分：每家跟左右邻居各有一道侧门，另外还有一条通往中心的路。<b>三人平分</b>则没有中心圈，也没有三管炮，打法跟 1v1 一样。</li>' +
+    '<li>打掉一家之后，<b>他的地盘归你</b>：他朝第三家的门归你关 / 上锁，你也可以开对手朝这块占领区的门，从他家门口打过去。</li>' +
+    '<li>占领区里的门跟自家门一样：<b>只关不开</b>。</li>' +
+    '</ul></div>' +
+    '<div><h3>中心三管炮（三/四人混战）</h3><ul>' +
+    '<li>三管炮<b>打不掉，只能被抢</b>：抢炮一样要 <b>先开中间的锁 → 再开中间的门 → 打一炮</b>，然后插上你的旗。</li>' +
+    '<li>中心边界也是<b>两扇门</b>：<b>三管炮朝你的一扇</b>（你推开它才能抢炮）+ <b>你朝中心的一扇</b>（炮主推开它才打得到你）。</li>' +
+    '<li><b>你推开三管炮的门 ≠ 三管炮能打你</b>；三管炮要打你，得自己来推你朝中心那扇内门，你也能马上关门 / 上锁。</li>' +
+    '<li>占着炮的人可以把别人朝三管炮的门锁上（1 点一门），谁来抢都得多花 1 点。</li>' +
+    '<li>三管炮跟玩家一样：<b>挑一个目标点一次，砸 3 点伤害</b>，抢炮时不改动周围门的开关。</li>' +
+    '</ul></div>' +
+    '<div><h3>小提示</h3><ul>' +
+    '<li>绿圈 = 可点的门，红色虚线框 = 可打的目标。</li>' +
+    '<li>想进攻，手里至少攒 2 点（开门 + 开炮）；对方上了锁就要 3 点。</li>' +
+    '<li>行动点可以留着不用：这一轮攒着，下一轮赢一次就够「开门 + 开炮」两点。</li>' +
+    '</ul></div>' +
+    '</div>' +
+    '<h3 style="margin-top:16px;font-size:14px;text-align:left">原稿参考图</h3>' +
+    '<div class="gallery">' + Array.from({ length: 11 }, (_, i) => '<img src="' + (i + 1) + '.jpg" alt="ref' + (i + 1) + '">').join('') + '</div>' +
+    
+'<button class="primary bigBtn" id="closeRules">明白了</button>';
+  ov.classList.remove('hidden');
+  pn.querySelector('#closeRules').onclick = () => { SFX.click(); ov.classList.add('hidden'); };
+}
+
+/* =======================================================================
+   7. 启动
+   ======================================================================= */
+let SCALE = 1;
+function fitCanvas() {
+  const wrap = document.getElementById('boardWrap');
+  const size = Math.max(300, Math.min(wrap.clientWidth, wrap.clientHeight) - 10);
+  cvs.style.width = size + 'px';
+  cvs.style.height = size + 'px';
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const px = Math.round(size * dpr);
+  cvs.width = px; cvs.height = px;
+  SCALE = px / 1000;
+}
+window.addEventListener('resize', fitCanvas);
+function frame() {
+  if (S) {
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    draw();
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    stepFX();
+  }
+  requestAnimationFrame(frame);
+}
+let chosenMode = '2';
+let seatCfg = ['human', 'ai', 'ai', 'ai'];
+const chosenCount = () => (MODES[chosenMode] || MODES['2']).n;
+function buildSeatCfg() {
+  const el = document.getElementById('seatCfg');
+  const n = chosenCount();
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    html += '<div class="seatRow"><span><span class="dot" style="display:inline-block;background:' + COLORS[i] + ';vertical-align:-2px"></span> ' +
+      MODE_NAMES[chosenMode][i] + '</span><select data-i="' + i + '">' +
+      '<option value="human"' + (seatCfg[i] === 'human' ? ' selected' : '') + '>玩家</option>' +
+      '<option value="ai"' + (seatCfg[i] === 'ai' ? ' selected' : '') + '>电脑</option>' +
+      '</select></div>';
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('select').forEach(s => s.onchange = () => {
+    seatCfg[+s.dataset.i] = s.value; SFX.click();
+    if (seatCfg.slice(0, chosenCount()).every(v => v === 'ai')) { seatCfg[0] = 'human'; buildSeatCfg(); }
+  });
+}
+function startGame() {
+  newGame(chosenMode, seatCfg.slice(0, chosenCount()));
+  fitCanvas();
+  renderButtons();
+  gameLoop();
+}
+document.querySelectorAll('#modes .modeCard').forEach(c => c.onclick = () => {
+  document.querySelectorAll('#modes .modeCard').forEach(x => x.classList.remove('sel'));
+  c.classList.add('sel');
+  chosenMode = c.dataset.mode || '2';
+  for (let i = 0; i < 4; i++) if (i >= chosenCount()) seatCfg[i] = 'ai';
+  if (seatCfg.slice(0, chosenCount()).every(v => v === 'ai')) seatCfg[0] = 'human';
+  buildSeatCfg();
+  SFX.click();
+});
+document.getElementById('startBtn').onclick = () => {
+  SFX.click();
+  document.getElementById('startOverlay').classList.add('hidden');
+  startGame();
+};
+document.getElementById('rulesBtn').onclick = () => { SFX.click(); showRules(); };
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (S && S.rpsResolver) {
+    const map = { '1': 'rock', '2': 'scissors', '3': 'paper', 'j': 'rock', 'k': 'scissors', 'l': 'paper' };
+    if (map[e.key]) { SFX.click(); S.rpsResolver(map[e.key]); return; }
+  }
+  if (e.key === 'Escape' && S && S.pending) clearPending();
+  if (e.key === 'Enter' && S && S.phase === 'turn' && S.awaiting) endTurn();
+});
+
+buildSeatCfg();
+fitCanvas();
+newGame('2', ['human', 'ai']);
+S.phase = 'idle';
+S.log = [];
+renderLog();
+draw();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
