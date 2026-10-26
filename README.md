@@ -2,7 +2,7 @@
 
 一款单文件网页桌游：**双击 HTML 就能玩**，不装引擎、不联网、不用服务器。
 
-[▶ 在线试玩](https://atg2006.github.io/fire-door/) · [完整规则](打炮-说明.md) · [设计说明](#关于)
+[▶ 在线试玩](https://atg2006.github.io/fire-door/) · [⬇ 安卓 APK](#安卓版apk) · [完整规则](打炮-说明.md)
 
 <p align="center"><img src="docs/board-3p.png" width="760" alt="三人混战，中心三管炮"></p>
 
@@ -42,6 +42,15 @@ git clone https://github.com/atg2006/fire-door.git
 cd fire-door
 # 双击 打炮.html
 ```
+
+## 安卓版（APK）
+
+[⬇ 下载 FireDoor-1.0.0.apk](https://github.com/atg2006/fire-door/releases/download/v1.0.0/FireDoor-1.0.0.apk)
+
+- 约 69 KB，支持 Android 5.0（API 21）及以上
+- 游戏已打包进 APK，**完全离线可玩**，不需要浏览器和网络
+- 下载后点开安装；首次安装需在系统里允许「安装未知来源应用」
+- 界面按横屏设计，建议横屏游玩
 
 ## 操作
 
